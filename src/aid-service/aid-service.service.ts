@@ -8,18 +8,10 @@ import {
   DataSource,
   In,
   Not,
-  QueryResult,
   QueryRunner,
   SelectQueryBuilder,
 } from 'typeorm';
-import {
-  AidServiceProfileVerificationStatus,
-  AidServiceType,
-} from '../shared/enums/aid-service.enum';
 import { AidService } from '../entities/aid-service.entity';
-import { MailService } from '../mail/mail.service';
-
-import { AidServiceProvider, Room } from '../entities/room.entity';
 import { IQueryResult } from '../shared/interfaces/api-response.interface';
 import {
   AidServiceDTO,
@@ -30,27 +22,21 @@ import {
 } from '../shared/dtos/aid-service.dto';
 import { Console } from 'console';
 import { Profile } from '../entities/user.entity';
-import { AidServiceProfile } from '../entities/aid-service-profile.entity';
 import { FileUploadService } from '../file-upload/file-upload.service';
-import path from 'path';
-import { QueryRequestDTO } from '../shared/dtos/query-request.dto';
 import { Tag } from '../entities/tag.entity';
 import { TagDTO } from '../shared/dtos/tag.dto';
 import { AidServiceTag } from '../entities/aid-service-tag.entity';
 import { handleDateQuery } from '../shared/helpers/db';
-import { AidServiceProfileSelectFields } from './datasets/aid-service-profile-select';
 import { AidServiceSelectFields } from './datasets/aid-service-selection';
-import { MailDTO } from '../mail/dtos/mail.dto';
 import { NotificationService } from '../notifiction/notification.service';
-import { NotificationDto } from '../notifiction/dtos/notification.dto';
-import {
-  NotificationContext,
-  NotificationEventType,
-} from '../notifiction/enums/notification.enum';
 import { AidServiceCluster } from '../entities/aid-service-cluster.entity';
 import { Cluster } from '../entities/cluster.entity';
 import { AddOrRemoveAction } from '../user/enums/cluster.enum';
 import { ManageClustersDTO } from '../shared/dtos/cluster.dto';
+import { NotificationDto } from '../notifiction/dtos/notification.dto';
+import { NotificationContext, NotificationEventType } from '../notifiction/enums/notification.enum';
+import { AidServiceProfile } from '../entities/aid-service-profile.entity';
+import { AidServiceProfileSelectFields } from './datasets/aid-service-profile-select';
 
 @Injectable()
 export class AidServiceService {
@@ -280,6 +266,95 @@ export class AidServiceService {
     }
   }
 
+  async createOrUpdateAidServiceProfile(
+    userId: string,
+    dto: AidServiceProfileApplicationDTO,
+  ): Promise<AidServiceProfile> {
+    let updatedAidServiceProfile: AidServiceProfile;
+    let errorData: unknown;
+    const staledFiles = [];
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    try {
+      await queryRunner.startTransaction();
+
+      const { ...applicationDto } = dto;
+      let aidServiceProfile = await queryRunner.manager.findOne(
+        AidServiceProfile,
+        {
+          where: { profile: { userId } },
+        },
+      );
+
+      let isNewProfile = false;
+      if (aidServiceProfile) {
+       aidServiceProfile = { ...aidServiceProfile, ...applicationDto };
+      } else {
+        const profile = await queryRunner.manager.findOneBy(Profile, {
+          userId,
+        });
+
+        
+
+        if (!profile) throw new NotFoundException('User not found');
+      
+        aidServiceProfile = queryRunner.manager.create(AidServiceProfile, {
+          ...applicationDto,
+          profile,
+        });
+        isNewProfile = true;
+      }
+
+      const savedAidServiceProfile = await queryRunner.manager.save(
+        AidServiceProfile,
+        aidServiceProfile,
+      );
+      
+      await queryRunner.commitTransaction();
+      updatedAidServiceProfile = savedAidServiceProfile;
+
+      const notDto: NotificationDto = {
+        creator: savedAidServiceProfile.profile,
+        receivers: [
+          savedAidServiceProfile?.profile,
+          savedAidServiceProfile?.profile,
+        ],
+        context: NotificationContext.SERVICE_PROFILE,
+        contextEntityId: savedAidServiceProfile?.id,
+        notificationEventType: isNewProfile
+          ? NotificationEventType.AID_SERVICE_PROFILE_APPLICATION
+          : NotificationEventType.AID_SERVICE_PROFILE_APPLICATION_UPDATE,
+        title: isNewProfile
+          ? NotificationEventType.AID_SERVICE_PROFILE_APPLICATION
+          : NotificationEventType.AID_SERVICE_PROFILE_APPLICATION_UPDATE,
+        description: isNewProfile
+          ? `A New Application has been received`
+          : `Profile Application detail updated`,
+        data: {
+          link: `${process.env.APP_URL}/aid-service/profile?aspi=${savedAidServiceProfile?.id}`,
+        },
+      };
+      this.notificationService.sendNotification(notDto, {
+        sendEmail: true,
+        notifyAdmin: true,
+      });
+    } catch (error) {
+      errorData = error;
+      await queryRunner.rollbackTransaction();
+    } finally {
+      await queryRunner.release();
+      if (staledFiles.length > 0) {
+        staledFiles.forEach((fileUrl) =>
+          this.fileUploadService.deletEeFileCloudinary(fileUrl),
+        );
+      }
+
+      if (errorData) throw errorData;
+      return updatedAidServiceProfile;
+    }
+  }
+
+
   getQueryBuilder(): SelectQueryBuilder<AidService> {
     const repository = this.dataSource.manager.getRepository(AidService);
     return repository
@@ -369,261 +444,10 @@ export class AidServiceService {
     return { page: queryPage, limit: queryLimit, total, data };
   }
 
-  async createOrUpdateAidServiceProfile(
-    userId: string,
-    dto: AidServiceProfileApplicationDTO,
-  ): Promise<AidServiceProfile> {
-    let updatedAidServiceProfile: AidServiceProfile;
-    let errorData: unknown;
-    const staledFiles = [];
-
-    const queryRunner = this.dataSource.createQueryRunner();
-    try {
-      await queryRunner.startTransaction();
-
-      const { aidServiceId, ...applicationDto } = dto;
-      let aidServiceProfile = await queryRunner.manager.findOne(
-        AidServiceProfile,
-        {
-          where: { aidService: { id: aidServiceId }, profile: { userId } },
-        },
-      );
-
-      let isNewProfile = false;
-      if (aidServiceProfile) {
-        if (
-          applicationDto.businessDocumentUrl.trim() &&
-          applicationDto.businessDocumentUrl?.trim() !==
-            aidServiceProfile.businessDocumentUrl?.trim()
-        ) {
-          staledFiles.push(aidServiceProfile.businessDocumentUrl);
-        }
-
-        if (
-          applicationDto.mediaFile?.trim() &&
-          applicationDto.mediaFile?.trim() !==
-            aidServiceProfile.mediaFile?.trim()
-        ) {
-          staledFiles.push(aidServiceProfile.mediaFile);
-        }
-        aidServiceProfile = { ...aidServiceProfile, ...applicationDto };
-      } else {
-        const profile = await queryRunner.manager.findOneBy(Profile, {
-          userId,
-        });
-
-        const aidService = await queryRunner.manager.findOneBy(AidService, {
-          id: aidServiceId,
-        });
-
-        if (!profile) throw new NotFoundException('User not found');
-        if (!aidService)
-          throw new NotFoundException('Aidservice does not exist');
-
-        aidServiceProfile = queryRunner.manager.create(AidServiceProfile, {
-          ...applicationDto,
-          profile,
-          aidService,
-        });
-        isNewProfile = true;
-      }
-
-      const savedAidServiceProfile = await queryRunner.manager.save(
-        AidServiceProfile,
-        aidServiceProfile,
-      );
-      if (isNewProfile && savedAidServiceProfile.aidService) {
-        savedAidServiceProfile.aidService.noOfAidServiceProfiles =
-          Number(savedAidServiceProfile.aidService.noOfAidServiceProfiles) + 1;
-        await queryRunner.manager.save(
-          AidService,
-          savedAidServiceProfile.aidService,
-        );
-      }
-      await queryRunner.commitTransaction();
-      updatedAidServiceProfile = savedAidServiceProfile;
-
-      const notDto: NotificationDto = {
-        creator: savedAidServiceProfile.profile,
-        receivers: [
-          savedAidServiceProfile.aidService?.profile,
-          savedAidServiceProfile?.profile,
-        ],
-        context: NotificationContext.SERVICE_PROFILE,
-        contextEntityId: savedAidServiceProfile?.id,
-        notificationEventType: isNewProfile
-          ? NotificationEventType.AID_SERVICE_PROFILE_APPLICATION
-          : NotificationEventType.AID_SERVICE_PROFILE_APPLICATION_UPDATE,
-        title: isNewProfile
-          ? NotificationEventType.AID_SERVICE_PROFILE_APPLICATION
-          : NotificationEventType.AID_SERVICE_PROFILE_APPLICATION_UPDATE,
-        description: isNewProfile
-          ? `A New Application has been received`
-          : `Profile Application detail updated`,
-        data: {
-          link: `${process.env.APP_URL}/aid-service/profile?aspi=${savedAidServiceProfile?.id}`,
-        },
-      };
-      this.notificationService.sendNotification(notDto, {
-        sendEmail: true,
-        notifyAdmin: true,
-      });
-    } catch (error) {
-      errorData = error;
-      await queryRunner.rollbackTransaction();
-    } finally {
-      await queryRunner.release();
-      if (staledFiles.length > 0) {
-        staledFiles.forEach((fileUrl) =>
-          this.fileUploadService.deletEeFileCloudinary(fileUrl),
-        );
-      }
-
-      if (errorData) throw errorData;
-      return updatedAidServiceProfile;
-    }
-  }
-
-  async updateUserAidServiceVerificationStatus(
-    aidServiceProfileId: number,
-    dto: VerifyAidServiceProfileDTO,
-    userId: string,
-  ): Promise<AidServiceProfile> {
-    let updatedAidServiceProfile: AidServiceProfile;
-    let errorData: unknown;
-    const queryRunner = this.dataSource.createQueryRunner();
-    try {
-      await queryRunner.startTransaction();
-      let aidServiceProfile = await queryRunner.manager.findOne(
-        AidServiceProfile,
-        {
-          where: { id: aidServiceProfileId },
-          relations: ['profile'],
-        },
-      );
-      if (!aidServiceProfile)
-        throw new BadRequestException('Aid service profile not found');
-
-      const verifiedBy = await queryRunner.manager.findOneBy(Profile, {
-        userId,
-      });
-      aidServiceProfile.verificationStatus = dto.verificationStatus;
-      aidServiceProfile.verificationComment = dto.verificationComment;
-      aidServiceProfile.verifiedBy = verifiedBy;
-
-      const savedAidServiceProfile = await queryRunner.manager.save(
-        AidServiceProfile,
-        aidServiceProfile,
-      );
-      await queryRunner.commitTransaction();
-      updatedAidServiceProfile = savedAidServiceProfile;
-
-      const notDto: NotificationDto = {
-        creator: aidServiceProfile?.profile,
-        receivers: [aidServiceProfile.profile],
-        context: NotificationContext.SERVICE_PROFILE,
-        contextEntityId: aidServiceProfile.id,
-        notificationEventType:
-          dto.verificationStatus ===
-          AidServiceProfileVerificationStatus.VERIFIED
-            ? NotificationEventType.AID_SERVICE_PROFILE_APPLICATION_APPROVED
-            : NotificationEventType.AID_SERVICE_PROFILE_VERIFICATION_UPDATE,
-        title:
-          dto.verificationStatus ===
-          AidServiceProfileVerificationStatus.VERIFIED
-            ? NotificationEventType.AID_SERVICE_PROFILE_APPLICATION_APPROVED
-            : NotificationEventType.AID_SERVICE_PROFILE_VERIFICATION_UPDATE,
-        description: `The verification status of this profile has been updated to: ${dto.verificationStatus}`,
-        data: {
-          link: `${process.env.APP_URL}/aid-service/profile?aspi=${savedAidServiceProfile?.id}`,
-          receiverName: aidServiceProfile.profile?.firstName,
-          verification: dto.verificationStatus,
-          comment: dto.verificationComment,
-        },
-      };
-      this.notificationService.sendNotification(notDto, {
-        sendEmail: true,
-        notifyAdmin: false,
-      });
-    } catch (error) {
-      errorData = error;
-      await queryRunner.rollbackTransaction();
-    } finally {
-      await queryRunner.release();
-      if (errorData) throw errorData;
-      return updatedAidServiceProfile;
-    }
-  }
-
-  async updateUserAidService(
-    userId: string,
-    aidServiceId: number,
-    action: 'add' | 'remove',
-  ): Promise<AidServiceProfile> {
-    let updatedAidServiceProfile: AidServiceProfile;
-    let errorData: unknown;
-    const queryRunner = this.dataSource.createQueryRunner();
-    try {
-      await queryRunner.startTransaction();
-      let aidServiceProfile = await queryRunner.manager.findOne(
-        AidServiceProfile,
-        {
-          where: { aidService: { id: aidServiceId }, profile: { userId } },
-        },
-      );
-
-      if (action === 'add') {
-        if (aidServiceProfile) {
-          if (!aidServiceProfile.isDeleted)
-            throw new BadRequestException(
-              'Aid service has not been removed earlier',
-            );
-          aidServiceProfile.isDeleted = false;
-        } else {
-          const profile = await queryRunner.manager.findOneBy(Profile, {
-            userId,
-          });
-
-          const aidService = await queryRunner.manager.findOneBy(AidService, {
-            id: aidServiceId,
-          });
-
-          if (!profile) throw new NotFoundException('User not found');
-          if (!aidService)
-            throw new NotFoundException('Aidservice does not exist');
-
-          aidServiceProfile = queryRunner.manager.create(AidServiceProfile, {
-            profile,
-            aidService,
-          });
-        }
-      }
-      if (action === 'remove') {
-        if (!aidServiceProfile)
-          throw new BadRequestException('Aid service NOT already added');
-        aidServiceProfile.isDeleted = true;
-      }
-
-      const savedAidServiceProfile = await queryRunner.manager.save(
-        AidServiceProfile,
-        aidServiceProfile,
-      );
-      await queryRunner.commitTransaction();
-      updatedAidServiceProfile = savedAidServiceProfile;
-    } catch (error) {
-      errorData = error;
-      await queryRunner.rollbackTransaction();
-    } finally {
-      await queryRunner.release();
-      if (errorData) throw errorData;
-      return updatedAidServiceProfile;
-    }
-  }
-
   async getAidServiceProfiles(
     dto: QueryAidServiceProfileDTO,
   ): Promise<IQueryResult<AidServiceProfile>> {
-    const { clusterIds, verificationStatus, aidServiceId, aidServiceProfileId, userId, searchTerm } = dto;
+    const { clusterIds, aidServiceProfileId, userId, searchTerm } = dto;
 
     const queryOrder = dto.order ? dto.order : 'ASC';
     const queryPage = dto.page ? Number(dto.page) : 1;
@@ -639,9 +463,7 @@ export class AidServiceService {
       .leftJoinAndSelect("aidServiceClusters.cluster", "clusters")
       .where('aidServiceProfile.isDeleted = false');
 
-    if (aidServiceId) {
-      queryBuilder.andWhere('aidService.id = :aidServiceId', { aidServiceId });
-    }
+    
     
 
     if (clusterIds) {
@@ -653,20 +475,13 @@ export class AidServiceService {
     if (userId) {
       queryBuilder.andWhere('profile.userId = :userId', { userId });
     }
-    if (aidServiceId) {
-      queryBuilder.andWhere('aidService.id = :aidServiceId', { aidServiceId });
-    }
+    
 
     if(aidServiceProfileId){
       queryBuilder.andWhere(`aidServiceProfile.id = :aidServiceProfileId`, {aidServiceProfileId})
     }
 
-    if (verificationStatus) {
-      queryBuilder.andWhere(
-        'aidServiceProfile.verificationStatus = :verificationStatus',
-        { verificationStatus },
-      );
-    }
+    
 
     if (searchTerm) {
       let queryStr = `LOWER(aidServiceProfile.name) LIKE :searchTerm`;

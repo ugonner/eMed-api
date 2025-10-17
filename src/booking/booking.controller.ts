@@ -53,12 +53,6 @@ export class BookingController {
         return ApiResponse.success("Booking confirmed successfully", res);
     }
 
-    @Post("profile/validate")
-    async validateProfileForBooking(
-        @Body() payload: CreateBookingDTO
-    ){
-        const res = await this.bookingService.isServiceProfileEligibleForBooking(payload.aidServiceProfileId, payload)
-    }
 
     @Get()
     async getBookings(

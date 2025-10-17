@@ -10,11 +10,16 @@ import {
   QueryRunner,
   SelectQueryBuilder,
 } from 'typeorm';
-import { BookingDTO, CreateBookingDTO, QueryBookingDTO, UpdateBookinDTO } from '../shared/dtos/booking.dto';
+import {
+  BookingDTO,
+  CreateBookingDTO,
+  QueryBookingDTO,
+  UpdateBookinDTO,
+} from '../shared/dtos/booking.dto';
 import { Booking } from '../entities/booking.entity';
 import { Profile } from '../entities/user.entity';
 import { AidService } from '../entities/aid-service.entity';
-import { AidServiceProfile } from '../entities/aid-service-profile.entity';
+
 import { BookingStatus } from '../shared/enums/booking.enum';
 import { ProfileWallet } from '../entities/user-wallet.entity';
 import { IQueryResult } from '../shared/interfaces/api-response.interface';
@@ -25,6 +30,7 @@ import {
   NotificationContext,
   NotificationEventType,
 } from '../notifiction/enums/notification.enum';
+import { AidServiceProfile } from '../entities/aid-service-profile.entity';
 
 @Injectable()
 export class BookingService {
@@ -33,42 +39,19 @@ export class BookingService {
     private notificationService: NotificationService,
   ) {}
 
-  async isServiceProfileEligibleForBooking(
-    aidServiceProfileId: number,
-    bookingDto: CreateBookingDTO,
-    queryRunner?: QueryRunner,
-  ): Promise<boolean> {
-    queryRunner = queryRunner || this.dataSource.createQueryRunner();
+  getBookingTotalAmount(dto: BookingDTO, aidService: AidService): number {
+    const vat =
+      (Number(process.env.VAT_RATE || 1) / 100) *
+      Number(aidService.serviceRate);
 
-    if (!aidServiceProfileId)
-      throw new BadRequestException('aidServiceProfileId is required');
-    const aidServiceProfile = await queryRunner.manager.findOne(
-      AidServiceProfile,
-      {
-        where: { id: aidServiceProfileId },
-        relations: ['profile', 'aidService'],
-      },
-    );
+    const transportationCost = /Anambra/i.test(dto.locationAddress?.state)
+      ? 5000
+      : 10000;
+    let totalAmount = Number(aidService.serviceRate) + vat + transportationCost;
 
-    const availableProfiles = await this.getBookingEligibleProfiles({
-      bookingStartDateTime: bookingDto.startDate,
-      bookingEndDateTime: new Date(
-        new Date(bookingDto.startDate).getTime() + Number(bookingDto.duration),
-      ).toISOString(),
-      aidServiceId: bookingDto.aidServiceId,
-    });
-    if (aidServiceProfile.aidService?.id !== bookingDto.aidServiceId)
-      throw new BadRequestException(
-        'Selected provider does not offer the service',
-      );
-    if (
-      !availableProfiles.find(
-        (profile) => profile.userId === aidServiceProfile.profile?.userId,
-      )
-    )
-      throw new BadRequestException('Selected provider is not available');
-    return true;
+    return totalAmount;
   }
+
 
   async createBooking(dto: CreateBookingDTO, userId: string): Promise<Booking> {
     let newBooking: Booking;
@@ -89,7 +72,7 @@ export class BookingService {
         throw new BadRequestException('Aid service does not exist');
 
       const endDate = new Date(
-        new Date(bookingDto.startDate).getTime() + Number(bookingDto.duration),
+        new Date(bookingDto.startDate).getTime() + Number(60 * 60 * 1000),
       ).toISOString();
 
       const bookingInstance: Booking = queryRunner.manager.create(Booking, {
@@ -99,46 +82,8 @@ export class BookingService {
         aidService,
         profile,
       });
-
-      bookingInstance.totalAmount = Math.ceil(
-        (Number(bookingDto.duration) / 1000) *
-          (dto.isVirtualLocation
-            ? Number(aidService.videoCallRate)
-            : Number(aidService.onSiteRate)),
-      );
-      bookingInstance.totalAmount =
-        (Number(process.env.VAT_RATE) / 100) *
-          Number(bookingInstance.totalAmount) +
-        Number(bookingInstance.totalAmount);
+      bookingInstance.totalAmount = this.getBookingTotalAmount(bookingDto, aidService);
       bookingInstance.compositeBookingId = `${profile.userId}-${new Date(bookingDto.startDate).getTime()}`;
-
-      if (aidServiceProfileId) {
-        const aidServiceProfile = await queryRunner.manager.findOne(
-          AidServiceProfile,
-          {
-            where: { id: aidServiceProfileId },
-            relations: ['profile', 'aidService'],
-          },
-        );
-
-        const availableProfiles = await this.getBookingEligibleProfiles({
-          bookingStartDateTime: bookingInstance.startDate,
-          bookingEndDateTime: bookingInstance.endDate,
-          aidServiceId: aidServiceId,
-        });
-        if (aidServiceProfile.aidService?.id !== aidServiceId)
-          throw new BadRequestException(
-            'Selected provider does not offer the service',
-          );
-        if (
-          !availableProfiles.find(
-            (profile) => profile.userId === aidServiceProfile.profile?.userId,
-          )
-        )
-          throw new BadRequestException('Selected provider is not available');
-        bookingInstance.aidServiceProfile = aidServiceProfile;
-        bookingInstance.isMatched = true;
-      }
 
       const savedBooking = await queryRunner.manager.save(
         Booking,
@@ -150,14 +95,15 @@ export class BookingService {
       const notificationDto: NotificationDto = {
         creator: profile,
         receivers: [profile],
-        notificationEventType: NotificationEventType.AID_SERVICE_BOOKING_CREATION,
+        notificationEventType:
+          NotificationEventType.AID_SERVICE_BOOKING_CREATION,
         context: NotificationContext.SERVICE_BOOKING,
         contextEntityId: savedBooking.id,
         title: NotificationEventType.AID_SERVICE_BOOKING_CREATION,
         description: 'A Booking has been created for a service with detail',
         avatar: profile.avatar || aidService?.avatar,
         data: {
-          "link": `${process.env.APP_URL}/booking/invoice?bi=${savedBooking.id}`,
+          link: `${process.env.APP_URL}/booking/invoice?bi=${savedBooking.id}`,
           'Composte Booking No': savedBooking.compositeBookingId,
         },
       };
@@ -185,8 +131,8 @@ export class BookingService {
     const queryRunner = this.dataSource.createQueryRunner();
     try {
       await queryRunner.startTransaction();
-     const profile = await queryRunner.manager.findOneBy(Profile, {userId});
-     if(!profile) throw new NotFoundException("User profile not found");
+      const profile = await queryRunner.manager.findOneBy(Profile, { userId });
+      if (!profile) throw new NotFoundException('User profile not found');
 
       const booking = await queryRunner.manager.findOne(Booking, {
         where: { id: bookingId },
@@ -212,7 +158,10 @@ export class BookingService {
           );
         booking.confirmedByUser = true;
 
-        const bookingAidServiceProfile = booking.aidServiceProfile;
+        const bookingAidServiceProfile = await queryRunner.manager.findOneBy(
+          AidServiceProfile,
+          { profile: { email: `${process.env.OFFICIAL_PROFILE_EMAIL}` } },
+        );
         const userWallet = await queryRunner.manager.findOneBy(ProfileWallet, {
           profile: { userId },
         });
@@ -232,9 +181,8 @@ export class BookingService {
           providerWallet,
         ]);
 
-        bookingAidServiceProfile.onSiteEarnings =
-          Number(bookingAidServiceProfile.onSiteEarnings) +
-          Number(booking.totalAmount);
+        bookingAidServiceProfile.noOfServicesCompleted =
+          Number(bookingAidServiceProfile.noOfServicesCompleted) + 1;
         await queryRunner.manager.save(
           AidServiceProfile,
           bookingAidServiceProfile,
@@ -247,19 +195,23 @@ export class BookingService {
 
       const notDto: NotificationDto = {
         creator: profile,
-        receivers: userType.isProvider ? [booking?.profile] : [booking.aidServiceProfile?.profile],
+        receivers: userType.isProvider
+          ? [booking?.profile]
+          : [booking.aidServiceProfile?.profile],
         context: NotificationContext.SERVICE_BOOKING,
         contextEntityId: bookingId,
         notificationEventType: NotificationEventType.AID_SERVICE_BOOKING_UPDATE,
         title: NotificationEventType.AID_SERVICE_BOOKING_UPDATE,
-        description: `Booking Service has been confirmed as delivered by ${userType.isProvider ? "Provider" : "Client"}`,
+        description: `Booking Service has been confirmed as delivered by ${userType.isProvider ? 'Provider' : 'Client'}`,
         data: {
           link: `${process.env.APP_URL}/booking/invoice?bi=${savedBooking.id}`,
           'Composte Booking No': savedBooking.compositeBookingId,
         },
-
-      }
-      this.notificationService.sendNotification(notDto, {sendEmail: true, notifyAdmin: false})
+      };
+      this.notificationService.sendNotification(notDto, {
+        sendEmail: true,
+        notifyAdmin: false,
+      });
     } catch (error) {
       errorData = error;
       await queryRunner.rollbackTransaction();
@@ -299,13 +251,10 @@ export class BookingService {
       .getRepository(Profile)
       .createQueryBuilder('profile');
     queryBuilder
-      .innerJoinAndSelect('profile.aidServiceProfiles', 'aidServiceProfiles')
-      .innerJoinAndSelect('aidServiceProfiles.aidService', 'aidService')
-      .leftJoin('aidServiceProfiles.bookings', 'bookings')
+      .innerJoinAndSelect('profile.aidServiceProfile', 'aidServiceProfile')
+      .leftJoin('aidServiceProfile.bookings', 'bookings')
       .where('profile.isDeleted = false')
-      .andWhere('aidServiceProfiles.aidServiceId = :aidServiceId', {
-        aidServiceId,
-      })
+      .andWhere('aidServiceProfile.isDeleted = false')
       .andWhere(
         '((bookings.startDate) >= :oneHourAfterEndTime) || ((bookings.endDate) <= :oneHourBeforeStartTime) || bookings.id IS NULL',
         {
@@ -315,7 +264,6 @@ export class BookingService {
       );
 
     return await queryBuilder.getMany();
-    
   }
 
   async matchBookingWithServiceProfile(
@@ -361,9 +309,7 @@ export class BookingService {
             (a as Profile & { score: number }).score
           );
         });
-        booking.aidServiceProfile = sortedProfiles[0].aidServiceProfiles.find(
-          (aidProfile) => aidProfile.aidService.id === booking.aidService.id,
-        );
+        booking.aidServiceProfile = sortedProfiles[0].aidServiceProfile;
         booking.isMatched = true;
       }
       const savedBooking = await queryRunner.manager.save(Booking, {
@@ -377,21 +323,22 @@ export class BookingService {
         receivers: [booking.profile, booking.aidServiceProfile?.profile],
         context: NotificationContext.SERVICE_BOOKING,
         contextEntityId: savedBooking.id,
-        notificationEventType: NotificationEventType.AID_SERVICE_BOOKING_PROVIDER_MATCH,
+        notificationEventType:
+          NotificationEventType.AID_SERVICE_BOOKING_PROVIDER_MATCH,
         title: NotificationEventType.AID_SERVICE_BOOKING_PROVIDER_MATCH,
-        description: "The booking has been matched with a provider",
-        avatar: savedBooking.aidServiceProfile?.mediaFile || booking.aidService?.avatar,
+        description: 'The booking has been matched with a provider',
+        avatar:
+          savedBooking.aidServiceProfile?.profile?.avatar ||
+          booking.aidService?.avatar,
         data: {
           link: `${process.env.APP_URL}/booking/invoice?bi=${savedBooking.id}`,
           'Composte Booking No': savedBooking.compositeBookingId,
         },
-
-      }
+      };
       this.notificationService.sendNotification(notDto, {
         notifyAdmin: true,
-        sendEmail: true
+        sendEmail: true,
       });
-
     } catch (error) {
       errorData = error;
       await queryRunner.rollbackTransaction();
@@ -402,25 +349,36 @@ export class BookingService {
     }
   }
 
-  async updateBooking(userId: string, bookingId: number, dto: UpdateBookinDTO): Promise<Booking> {
+  async updateBooking(
+    userId: string,
+    bookingId: number,
+    dto: UpdateBookinDTO,
+  ): Promise<Booking> {
     let updatedBooking: Booking;
     let errorData: unknown;
     const queryRunner = this.dataSource.createQueryRunner();
-    try{
+    try {
       await queryRunner.startTransaction();
 
-      const profile = await queryRunner.manager.findOneBy(Profile, {userId});
-      if(!profile) throw new NotFoundException("User profile not foud");
+      const profile = await queryRunner.manager.findOneBy(Profile, { userId });
+      if (!profile) throw new NotFoundException('User profile not foud');
       const booking = await queryRunner.manager.findOne(Booking, {
-        where: {id: bookingId},
-        relations: ["profile", "aidService", "aidServiceProfile", "aidServiceProfile.profile"]
+        where: { id: bookingId },
+        relations: [
+          'profile',
+          'aidService',
+          'aidServiceProfile',
+          'aidServiceProfile.profile',
+        ],
       });
-      if(!booking) throw new NotFoundException("booking not found");
-      
-      if(booking.bookingStatus !== BookingStatus.PENDING) throw new BadRequestException("You can no longor update booking");
+      if (!booking) throw new NotFoundException('booking not found');
+
+      if (booking.bookingStatus !== BookingStatus.PENDING)
+        throw new BadRequestException('You can no longor update booking');
       const savedBooking = await queryRunner.manager.save(Booking, {
-        ...booking, ...dto as BookingDTO
-      })
+        ...booking,
+        ...(dto as BookingDTO),
+      });
       await queryRunner.commitTransaction();
       updatedBooking = savedBooking;
 
@@ -431,32 +389,32 @@ export class BookingService {
         contextEntityId: savedBooking.id,
         notificationEventType: NotificationEventType.AID_SERVICE_BOOKING_UPDATE,
         title: NotificationEventType.AID_SERVICE_BOOKING_UPDATE,
-        description: dto.bookingStatus ? `Booking status has been updated to ${dto.bookingStatus} by ${profile.firstName}` : `Booking information has been updated by ${profile.firstName}, please re-check booking`,
+        description: dto.bookingStatus
+          ? `Booking status has been updated to ${dto.bookingStatus} by ${profile.firstName}`
+          : `Booking information has been updated by ${profile.firstName}, please re-check booking`,
         avatar: profile.avatar,
         data: {
           link: `${process.env.APP_URL}/booking/invoice?bi=${savedBooking.id}`,
           'Composte Booking No': savedBooking.compositeBookingId,
         },
-      }
+      };
       this.notificationService.sendNotification(notDto, {
         notifyAdmin: false,
-         sendEmail: true
-      })
-    }catch(error){
+        sendEmail: true,
+      });
+    } catch (error) {
       errorData = error;
       await queryRunner.rollbackTransaction();
-    }finally{
+    } finally {
       await queryRunner.release();
-      if(errorData) throw errorData;
+      if (errorData) throw errorData;
       return updatedBooking;
     }
   }
 
   scoreProfileToBooking(profile: Profile, booking: Booking): number {
     let score = 0;
-    const targetAidProfile = profile.aidServiceProfiles.find(
-      (aidProfile) => aidProfile.aidService.id === booking.aidService.id,
-    );
+    const targetAidProfile = profile.aidServiceProfile;
     if (profile.disabilityType) score += 5;
 
     const countryMatch = new RegExp(booking.locationAddress.country, 'i').test(
@@ -527,16 +485,20 @@ export class BookingService {
       );
     }
 
-    if(aidServiceId){
-      queryBuilder.andWhere(`aidService.id = :aidServiceId`, {aidServiceId})
+    if (aidServiceId) {
+      queryBuilder.andWhere(`aidService.id = :aidServiceId`, { aidServiceId });
     }
-    if(aidServiceProfileId){
-      queryBuilder.andWhere(`aidServiceProfile.id = :aidServiceProfileId`, {aidServiceProfileId})
+    if (aidServiceProfileId) {
+      queryBuilder.andWhere(`aidServiceProfile.id = :aidServiceProfileId`, {
+        aidServiceProfileId,
+      });
     }
-    if(userId){
-      queryBuilder.andWhere("profile.userId = :userId || aidServiceProfileProfile.userId = :userId",  {userId})
+    if (userId) {
+      queryBuilder.andWhere(
+        'profile.userId = :userId || aidServiceProfileProfile.userId = :userId',
+        { userId },
+      );
     }
-    
 
     if (searchTerm) {
       const searchFields = ['name', 'description'];

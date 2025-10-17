@@ -4,10 +4,9 @@ import { TransactionService } from './transaction.service';
 import { PaystackService } from './paystack.service';
 import { BookingModule } from '../booking/booking.module';
 import { WalletService } from './wallet.service';
-import { CallModule } from '../call/call.module';
 
 @Module({
-  imports: [BookingModule, CallModule],
+  imports: [BookingModule],
   controllers: [TransactionController],
   providers: [TransactionService, PaystackService, WalletService]
 })

@@ -28,18 +28,6 @@ export class AidServiceController {
         return ApiResponse.success("Aid service created", res);
     }
 
-    @Post("update-aid-service/:userId/:action")
-    async updateAidService(
-        @Body() payload: UpdateUserAidServiceDTO,
-        @Param("action") action: "add" | "remove",
-        @Param("userId") userId: string 
-    ){
-        action = action === "remove" ? "remove" : "add";
-        const res = await this.aidServiceService.updateUserAidService(userId as string, Number(payload.id), action);
-        return ApiResponse.success("Aid service updated", res);
-    }
-
-
     @Put("/:id")
     async editAidService(
         @Param("id", ParseIntPipe) aidServiceId: number,
@@ -53,8 +41,10 @@ export class AidServiceController {
     @UseGuards(JwtGuard)
     async createAidServiceProfileApplication(
         @Body() payload: AidServiceProfileApplicationDTO,
-        @User("userId") userId: string
+        @User("userId") userId: string,
+        @Query() queryPayload: {ui: string}
     ){
+       userId = queryPayload.ui ? queryPayload.ui : userId;
         const res = await this.aidServiceService.createOrUpdateAidServiceProfile(userId, payload);
         return ApiResponse.success("Application created successfully", res);
     }
@@ -69,18 +59,6 @@ export class AidServiceController {
         const res = await this.aidServiceService.createOrUpdateAidServiceProfile(userId, payload);
         return ApiResponse.success("Application created successfully", res);
     }
-
-    @Put("/profile/status/:aidServiceProfileId")
-    @UseGuards(JwtGuard)
-    async updateAidServiceProfileApplicationStatus(
-        @Body() payload: VerifyAidServiceProfileDTO,
-        @Param("aidServiceProfileId", new ParseIntPipe()) aidServiceProfileId: number,
-        @User("userId") userId: string
-    ){
-        const res = await this.aidServiceService.updateUserAidServiceVerificationStatus(aidServiceProfileId, payload, userId);
-        return ApiResponse.success("Application Verification updated successfully", res);
-    }
-
 
     @Get("/profile")
     async getAidServiceProfiles(

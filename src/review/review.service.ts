@@ -4,15 +4,14 @@ import { DataSource } from 'typeorm';
 import { QueryReviewAndReportDTO, ReviewAndRatingDTO } from '../shared/dtos/review.dto';
 import { ReviewAndRating } from '../entities/review.entity';
 import { Profile } from '../entities/user.entity';
-import { AidServiceProfile } from '../entities/aid-service-profile.entity';
 import { ServiceType } from '../shared/enums/review';
 import { Booking } from '../entities/booking.entity';
-import { CallRoom } from '../entities/call.entity';
 import { IQueryResult } from '../shared/interfaces/api-response.interface';
 import { handleDateQuery } from '../shared/helpers/db';
 import { NotificationService } from '../notifiction/notification.service';
 import { NotificationDto } from '../notifiction/dtos/notification.dto';
 import { NotificationContext, NotificationEventType } from '../notifiction/enums/notification.enum';
+import { AidServiceProfile } from '../entities/aid-service-profile.entity';
 
 @Injectable()
 export class ReviewService {
@@ -48,19 +47,13 @@ export class ReviewService {
                 booking.review = dto.review;
                 await queryRunner.manager.save(Booking, {...booking})
             }
-            else if(dto.serviceType === ServiceType.CALL) {
-                const callRoom = await queryRunner.manager.findOne(CallRoom, {
-                    where: {id: dto.serviceTypeEntityId},
-                    relations: ["aidServiceProfile", "aidServiceProfile.profile"]
+            else if(dto.serviceType === ServiceType.APP_PROFILE) {
+                aidServiceProfile = await queryRunner.manager.findOne(AidServiceProfile, {
+                  where: {profile: {email: `${process.env.OFFICIAL_PROFILE_EMAIL}`}}
                 });
-                if(!callRoom) throw new NotFoundException("Call room not found");
-
-                aidServiceProfile = callRoom.aidServiceProfile;
-                entityOwner = callRoom.aidServiceProfile.profile;
-                callRoom.rating = dto.rating;
-                callRoom.review = dto.review;
-                await queryRunner.manager.save(CallRoom, {...callRoom})
-            }
+                
+                entityOwner = aidServiceProfile.profile;
+              }
 
             if(!aidServiceProfile) throw new NotFoundException("Service profile not found");
             aidServiceProfile.averageRating = ((Number(aidServiceProfile.averageRating) * Number(aidServiceProfile.noOfRatings)) + Number(dto.rating)) / (Number(aidServiceProfile.noOfRatings) + 1);
@@ -120,9 +113,9 @@ export class ReviewService {
             queryBuilder.leftJoinAndSelect("booking", "booking", "review.serviceEntityId = booking.id")
             .leftJoinAndSelect("booking.aidServiceProfile", "aidServiceProfile");
         }
-        else if(dto.serviceType === ServiceType.CALL) {
-            queryBuilder.leftJoinAndSelect("call_room", "callRoom", "review.serviceEntityId = call_room.id" )
-            .leftJoinAndSelect("callRoom.aidServiceProfile", "aidServiceProfile");
+        else if(dto.serviceType === ServiceType.APP_PROFILE) {
+            queryBuilder.leftJoinAndSelect("profile", "appProfile", "review.serviceEntityId = profile.id" )
+            .leftJoinAndSelect("appProfile.aidServiceProfile", "aidServiceProfile");
         }
         queryBuilder.leftJoinAndSelect("aidServiceProfile.profile", "serviceProfile");
         

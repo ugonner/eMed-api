@@ -6,9 +6,7 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Profile } from '../entities/user.entity';
-import { AidServiceProfile } from '../entities/aid-service-profile.entity';
 import { Booking } from '../entities/booking.entity';
-import { CallRoom } from '../entities/call.entity';
 import { Report } from '../entities/report.entity';
 import { ServiceType } from '../shared/enums/review';
 import { IQueryResult } from '../shared/interfaces/api-response.interface';
@@ -27,6 +25,7 @@ import {
 import { ReportCommentDTO, ResolveReportDTO } from './dtos/report.sto';
 import { ReportComment } from '../entities/report-comment.entity';
 import { QueryRequestDTO } from '../shared/dtos/query-request.dto';
+import { AidServiceProfile } from '../entities/aid-service-profile.entity';
 
 @Injectable()
 export class ReportService {
@@ -56,15 +55,13 @@ export class ReportService {
 
         aidServiceProfile = booking.aidServiceProfile;
         entityOwner = booking.aidServiceProfile.profile;
-      } else if (dto.serviceType === ServiceType.CALL) {
-        const callRoom = await queryRunner.manager.findOne(CallRoom, {
-          where: { id: dto.serviceTypeEntityId },
-          relations: ['aidServiceProfile', 'aidServiceProfile.profile'],
+      } else if (dto.serviceType === ServiceType.APP_PROFILE) {
+        aidServiceProfile = await queryRunner.manager.findOne(AidServiceProfile, {
+          where: { profile: {email: `${process.env.OFFICIAL_PROFILE_EMAIL}`} },
+          relations: ['profile'],
         });
-        if (!callRoom) throw new NotFoundException('Call room not found');
-
-        aidServiceProfile = callRoom.aidServiceProfile;
-        entityOwner = callRoom.aidServiceProfile.profile;
+        
+        entityOwner = aidServiceProfile?.profile;
       }
 
       const reportData = queryRunner.manager.create(Report, dto);

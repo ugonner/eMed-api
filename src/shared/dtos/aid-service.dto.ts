@@ -2,16 +2,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEnum,
   IsNumber,
-  isNumberString,
-  IsNumberString,
   IsOptional,
-  isString,
   IsString,
   ValidateNested,
 } from 'class-validator';
 import { AidServiceProfileVerificationStatus } from '../enums/aid-service.enum';
 import { Type } from 'class-transformer';
-import { QueryRequestDTO } from './query-request.dto';
 import { TagDTO } from './tag.dto';
 import { QueryDateDTO } from './query-request.dto copy';
 
@@ -35,17 +31,7 @@ export class AidServiceDTO {
   @ApiPropertyOptional()
   @IsNumber()
   @IsOptional()
-  audioCallRate?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  videoCallRate?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  onSiteRate?: number;
+  serviceRate?: number;
 
   @ApiPropertyOptional()
   @ValidateNested({each: true})
@@ -98,6 +84,17 @@ export class ISocialMediaLinksDTO {
 }
 
 export class ILocationAddressDTO {
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  longitude?: number;
+  
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  latitude?: number;
+  
+
   @ApiProperty()
   @IsString()
   street: string;
@@ -128,37 +125,7 @@ export class ILocationAddressDTO {
 }
 
 export class AidServiceProfileApplicationDTO {
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  aidServiceId: number;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  businessDocumentUrl: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  mediaFile: string;
-
-  @ApiPropertyOptional()
-  @ValidateNested()
-  @Type(() => ISocialMediaLinksDTO)
-  @IsOptional()
-  socialMediaLinks: ISocialMediaLinksDTO;
-
+  
   @ApiPropertyOptional()
   @ValidateNested()
   @Type(() => ILocationAddressDTO)
@@ -203,16 +170,6 @@ export class QueryAidServiceProfileDTO extends QueryDateDTO {
   @IsOptional()
   aidServiceProfileId?: string;
   
-@ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  aidServiceId?: string;
-
-  @ApiPropertyOptional()
-  @IsEnum(AidServiceProfileVerificationStatus)
-  @IsOptional()
-  verificationStatus?: AidServiceProfileVerificationStatus;
-
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
@@ -224,9 +181,4 @@ export class QueryAidServiceProfileDTO extends QueryDateDTO {
   @IsOptional()
   clusterIds?: string;
 }
-export interface ICallAidServiceProfileDTO {
-  id: number;
-  verificationStatus: AidServiceProfileVerificationStatus;
-  aidService: AidServiceDTO;
-  isDeleted: boolean;
-}
+

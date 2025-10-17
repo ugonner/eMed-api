@@ -1,13 +1,7 @@
 export const AidServiceProfileSelectFields: string[] = [
 
     "aidServiceProfile.id",
-    "aidServiceProfile.name",
-    "aidServiceProfile.mediaFile",
-    "aidServiceProfile.noOfAudioCallServices",
-    "aidServiceProfile.noOfVideoCallServices",
-    "aidServiceProfile.noOfOnSiteServices",
-    "aidServiceProfile.totalServicesRendered",
-    "aidServiceProfile.verificationStatus",
+    "aidServiceProfile.noOfServicesCompleted",
     "aidServiceProfile.createdAt",
     "profile.id",
     "profile.userId",
@@ -15,7 +9,5 @@ export const AidServiceProfileSelectFields: string[] = [
     "profile.lastName",
     "profile.email",
     "profile.disabilityType",
-    "profile.avatar",
-    "aidService.id",
-    "aidService.name",
+    "profile.avatar"
 ];

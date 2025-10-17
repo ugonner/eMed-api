@@ -1,29 +1,24 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { CallModule } from './call/call.module';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
-import { NotificationModule } from './notifiction/notification.module';
 import { AidServiceModule } from './aid-service/aid-service.module';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { MailModule } from './mail/mail.module';
-import { TalkableModule } from './talkable/talkable.module';
 import { FileUploadModule } from './file-upload/file-upload.module';
 import * as path from 'path';
-import { ServeStaticModule } from '@nestjs/serve-static';
 import { BookingModule } from './booking/booking.module';
 import { ReviewModule } from './review/review.module';
 import { ReportModule } from './report/report.module';
 import { TransactionModule } from './transaction/transaction.module';
+import { NotificationModule } from './notifiction/notification.module';
 
 @Module({
   imports: [
-    TalkableModule,
-    CallModule,
     ConfigModule.forRoot({isGlobal: true}),
     TypeOrmModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
@@ -43,7 +38,6 @@ import { TransactionModule } from './transaction/transaction.module';
     }),
     AuthModule,
     UserModule,
-    NotificationModule,
     AidServiceModule,
     MailerModule.forRoot({
       transport: {

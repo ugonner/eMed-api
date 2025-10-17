@@ -5,8 +5,6 @@ import { OpenAPIConfiguration } from './documentation';
 import * as fs from 'fs';
 import * as path from 'path';
 import { HttpsOptions } from '@nestjs/common/interfaces/external/https-options.interface';
-import { PeerGateway } from './call/peer/peer.gateway';
-import { ExpressPeerServer } from 'peer';
 
 async function bootstrap() {
  const   httpsOptions: HttpsOptions = {
@@ -32,8 +30,6 @@ async function bootstrap() {
   OpenAPIConfiguration.configureSwagger(app);
   
  
-  const peerGateway = app.get<PeerGateway>(PeerGateway);
-  peerGateway.startPeerServer(app);
  
 const port = process.env.PORT || 8000;
   await app.listen(port, "0.0.0.0", () => console.log("Server RUnning on port", port ));

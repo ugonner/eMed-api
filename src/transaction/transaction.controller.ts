@@ -10,7 +10,6 @@ import { InitiatePaymentDto, PaystackInitiatePaymentResponseDto, PaystackWebHook
 import { PaystackCurrency } from './enums/paystack.enum';
 import { BinaryLike } from 'crypto';
 import { WalletService } from './wallet.service';
-import { CallGateway } from '../call/call.gateway';
 import { BroadcastEvents } from '../shared/enums/events.enum';
 
 @Controller('transaction')
@@ -20,7 +19,6 @@ export class TransactionController {
         private paystackService: PaystackService,
         private walletService: WalletService,
         
-        private eventGateWay: CallGateway
     ){}
 
     @Post()
@@ -70,8 +68,6 @@ export class TransactionController {
            const transaction = await this.transactionService.updatePayment(metadata);
             transaction.paymentStatus = metadata.paymentStatus;
             
-            const connectedUser = this.eventGateWay.getUser(transaction.profile.userId);
-         if(connectedUser) this.eventGateWay.getServer()?.to((await connectedUser)?.socketId)?.emit(BroadcastEvents.PAYMENT_COMPLETION, transaction)
         
         return ApiResponse.success("Transction updated successfully", transaction);
     }

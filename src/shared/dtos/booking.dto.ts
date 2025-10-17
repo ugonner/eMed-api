@@ -5,7 +5,6 @@ import {
   IsBooleanString,
   IsEnum,
   IsNumber,
-  IsNumberString,
   IsOptional,
   IsString,
   IsUrl,
@@ -14,32 +13,6 @@ import {
 import { ILocationAddressDTO } from './aid-service.dto';
 import { QueryDateDTO } from './query-request.dto copy';
 import { BookingStatus, BookingUpdateBookingStatus } from '../enums/booking.enum';
-
-export class VirtualLocationAddressDTO {
-  @ApiProperty()
-  @IsUrl()
-  linkAddress: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  passCode?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  userName?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  platform?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  additionalNotes?: string;
-}
 
 export class BookingDTO {
   @ApiPropertyOptional()
@@ -53,23 +26,10 @@ export class BookingDTO {
   @IsOptional()
   locationAddress?: ILocationAddressDTO;
 
-  @ApiPropertyOptional()
-  @ValidateNested()
-  @Type(() => VirtualLocationAddressDTO)
-  @IsOptional()
-  virtualLocationAddress?: VirtualLocationAddressDTO;
-
-  @ApiProperty()
-  @IsBoolean()
-  isVirtualLocation: boolean;
-
   @ApiProperty()
   @IsString()
   startDate: string;
 
-  @ApiProperty()
-  @IsNumber()
-  duration: number;
 
 }
 

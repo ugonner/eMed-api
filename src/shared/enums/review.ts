@@ -1,5 +1,5 @@
 
 export enum ServiceType {
-  CALL = "Call",
+  APP_PROFILE = "App_Profile",
   BOOKING = "Booking",
 }

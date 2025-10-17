@@ -12,12 +12,11 @@ import {
 } from 'typeorm';
 import { Auth } from './auth.entity';
 import { DisabilityType, Gender } from '../shared/enums/user.enum';
-import { AidService } from './aid-service.entity';
-import { CallRoom } from './call.entity';
-import { AidServiceProfile } from './aid-service-profile.entity';
+
 import { ProfileWallet } from './user-wallet.entity';
 import { Booking } from './booking.entity';
 import { ProfileCluster } from './user-cluster.entity';
+import { AidServiceProfile } from './aid-service-profile.entity';
 
 @Entity()
 export class Profile {
@@ -51,17 +50,8 @@ export class Profile {
   @OneToOne(() => Auth, (auth) => auth.profile)
   account: Auth;
 
-  @OneToMany(
-    () => AidServiceProfile,
-    (aidServiceProfile) => aidServiceProfile.profile,
-  )
-  aidServiceProfiles: AidServiceProfile[];
 
-  @OneToMany(() => CallRoom, (callRoom) => callRoom.initiatedBy)
-  initiatedCalls: CallRoom[];
 
-  @ManyToMany(() => CallRoom, (callRoom) => callRoom.callMembers)
-  calls: CallRoom[];
 
   
     @OneToOne(() => ProfileWallet, (profileWallet) => profileWallet.profile, {
@@ -70,6 +60,13 @@ export class Profile {
     })
     @JoinColumn()
     wallet: ProfileWallet;
+    
+    @OneToOne(() => AidServiceProfile, (aidServiceProfile) => aidServiceProfile.profile, {
+      cascade: true,
+      onDelete: 'CASCADE',
+    })
+    @JoinColumn()
+    aidServiceProfile: AidServiceProfile;
 
     @OneToMany(() => ProfileCluster, (profileCluster) => profileCluster.profile )
     profileClusters: ProfileCluster[];
