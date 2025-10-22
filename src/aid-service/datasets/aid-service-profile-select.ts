@@ -1,6 +1,7 @@
 export const AidServiceProfileSelectFields: string[] = [
 
     "aidServiceProfile.id",
+    "aidServiceProfile.locationAddress",
     "aidServiceProfile.noOfServicesCompleted",
     "aidServiceProfile.createdAt",
     "profile.id",

@@ -20,11 +20,15 @@ const typeOrmConfig = {
     cli: {
       entitiesDir: path.join(__dirname, "dist/entities"),
       migrationsDir: path.join(__dirname, "dist/migrations"),
+     
       //"subscribersDir": "src/subscriber"
     },
-    ssl: process.env.NODE_ENV === 'production' 
-  ? { rejectUnauthorized: false } 
-  : false,
+  ssl: {
+    rejectUnauthorized: false, // For most hosts like Render, Railway, Supabase, Neon, Heroku
+  },
+  extra: {
+    sslmode: "require", // ✅ This sets sslMode=require
+  }
 };
 //export {typeOrmConfig};
 module.exports = new DataSource(typeOrmConfig);

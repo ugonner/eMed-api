@@ -145,6 +145,8 @@ export class AidServiceService {
       const adminProfile = await queryRunner.manager.findOneBy(Profile, {
         userId,
       });
+      if(!adminProfile) throw new NotFoundException("Admin Profile not found");
+      
 
       const name = aidServiceDto.name.toLowerCase();
       const serviceExists = await queryRunner.manager.findOneBy(AidService, {
