@@ -6,6 +6,9 @@ import { MailService } from '../mail/mail.service';
 import { NotificationDto } from './dtos/notification.dto';
 import { Notification } from '../entities/notification.entity';
 import { MailDTO } from '../mail/dtos/mail.dto';
+import { IQueryResult } from '../shared/interfaces/api-response.interface';
+import { QueryDateDTO } from '../shared/dtos/query-request.dto copy';
+import { dot } from 'node:test/reporters';
 
 @Injectable()
 export class NotificationService {
@@ -78,4 +81,6 @@ export class NotificationService {
       );
     }
   }
+
+  
 }

@@ -495,7 +495,7 @@ export class BookingService {
     }
     if (userId) {
       queryBuilder.andWhere(
-        'profile.userId = :userId || aidServiceProfileProfile.userId = :userId',
+        'profile.userId = :userId OR aidServiceProfileProfile.userId = :userId',
         { userId },
       );
     }

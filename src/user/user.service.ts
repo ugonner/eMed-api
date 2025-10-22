@@ -54,7 +54,7 @@ export class UserService {
   async getUser(userId: string): Promise<Profile> {
     const user = await this.dataSource.getRepository(Profile).findOne({
       where: { userId },
-      relations: ["profileClusters", "profileClusters.cluster", 'aidServiceProfiles', 'aidServiceProfiles.aidService'],
+      relations: ["profileClusters", "profileClusters.cluster", 'aidServiceProfiles', 'aidServiceProfile'],
     });
     if (!user) throw new NotFoundException('User not found');
     return user;
