@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, UseFilters, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, UseFilters, UseGuards } from '@nestjs/common';
 import { AidServiceService } from './aid-service.service';
 import { AidServiceDTO, AidServiceProfileApplicationDTO, QueryAidServiceDTO, QueryAidServiceProfileDTO, RequestAidServiceDTO, UpdateUserAidServiceDTO, VerifyAidServiceProfileDTO } from '../shared/dtos/aid-service.dto';
 import { User } from '../shared/guards/decorators/user.decorator';
@@ -88,6 +88,14 @@ export class AidServiceController {
     ){
         const res = await this.aidServiceService.getAidServiceProfile(aidServiceProfileId);
         return ApiResponse.success("Aid service profile fetched successfully", res);
+    }
+    @Delete("/:id")
+    @UseGuards(JwtGuard)
+    async deleteAidService(
+        @Param("id", new ParseIntPipe()) id: number
+    ){
+        const res = await this.aidServiceService.deleteAidService(id);
+        return ApiResponse.success("Service deleted successfully", res);
     }
 
     @Get("/:aidServiceId")
