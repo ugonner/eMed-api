@@ -28,6 +28,8 @@ import { MailService } from '../mail/mail.service';
 import { Role } from '../entities/role.entity';
 import { RoleDTO } from '../shared/dtos/role.dto';
 import { error } from 'console';
+import { AidServiceService } from '../aid-service/aid-service.service';
+import { AidServiceProfileApplicationDTO } from '../shared/dtos/aid-service.dto';
 
 @Injectable()
 export class AuthService {
@@ -37,6 +39,7 @@ export class AuthService {
     @InjectDataSource()
     private dataSource: DataSource,
     private mailService: MailService,
+    private aidServiceService: AidServiceService
   ) {}
 
   private logger: Logger = new Logger(AuthService.name);
@@ -62,12 +65,13 @@ export class AuthService {
         throw new BadRequestException('Email already / Phone number exists');
 
       const payload: Partial<Auth> = {
-        email: email.toLowerCase(),
         ...rest,
         firstName,
         lastName,
         isVerified: true, // TODO: Remove
       };
+      if(email) payload.email = email.toLowerCase();
+      if(dto.phoneNumber) payload.phoneNumber = dto.phoneNumber;
       payload.otpTime = new Date();
       payload.userId = await DBUtils.generateUniqueID(
         this.authRepository,
@@ -84,6 +88,7 @@ export class AuthService {
       const profile = queryRunner.manager.create(Profile, {
         userId: auth.userId,
         email: email.toLowerCase(),
+        phoneNumber: auth.phoneNumber,
         firstName,
         lastName,
         gender,
@@ -449,6 +454,52 @@ export class AuthService {
       await queryRunner.release();
       if(errorData) throw errorData;
       return updatedAuth;
+    }
+  }
+
+  async seedAdminProfile(): Promise<Auth>{
+    let adminProfile: Auth;
+    let errorData: unknown;
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    try{
+      await queryRunner.startTransaction();
+      const authDto: UserProfileDTO = {
+        email: process.env.OFFICIAL_PROFILE_EMAIL,
+        phoneNumber: `${process.env.OFFICIAL_PROFILE_PHONE_NUMBER}`,
+        password: "thanks123",
+        firstName: "FlexMedCare",
+        lastName: "Official"
+      };
+      adminProfile = await this.createAccount(authDto);
+      if(!adminProfile?.userId) throw new InternalServerErrorException("Admin profile not created");
+      const roleDto: RoleDTO = {
+        name: "SuperAdmin",
+        description: "Handles superintending administrative duties and roles"
+      };
+      const adminRole = await this.createRole(roleDto);
+      const assignRole = await this.assignRole(adminProfile.userId, adminRole.id);
+      if(!assignRole?.id) throw new InternalServerErrorException("Unble to assign admin role");
+      const dto: AidServiceProfileApplicationDTO = {
+        locationAddress: {
+          street: "Arom Junction",
+          city: "Awka",
+          locality: "Awka South",
+          state: "Anambra",
+          country: "Nigeria"
+        },
+        contactPhoneNumber: `${process.env.OFFICIAL_PROFILE_PHONE_NUMBER}`,
+      }
+      
+      await this.aidServiceService.createOrUpdateAidServiceProfile(adminProfile.userId, dto)
+      await queryRunner.commitTransaction();
+    }catch(error){
+      errorData = error;
+      await queryRunner.rollbackTransaction();
+    }finally{
+      await queryRunner.release();
+      if(errorData) throw errorData;
+      return adminProfile;
     }
   }
 }
