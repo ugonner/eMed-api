@@ -78,11 +78,7 @@ export class Auth {
   @Column({type: "bool", default: false})
   isDeleted: boolean;
 
-  @BeforeInsert()
-  formatEmail() {
-    this.email = this.email.toLowerCase();
-  }
-
+  
   @BeforeInsert()
   async hashPassword() {
     this.password = await bcrypt.hash(this.password, 10);

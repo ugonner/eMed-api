@@ -13,7 +13,7 @@ import { DataSource, QueryRunner, Repository, UpdateDateColumn } from 'typeorm';
 import { Auth } from '../entities/auth.entity';
 import * as bcrypt from 'bcryptjs';
 
-import { validate } from 'class-validator';
+import { IsPhoneNumber, validate } from 'class-validator';
 import { UserProfileDTO } from '../shared/dtos/user.dto';
 import { DBUtils } from '../shared/helpers/db';
 import { NotificationService } from '../notifiction/notification.service';
@@ -58,7 +58,7 @@ export class AuthService {
         dto;
 
       const userExist = await queryRunner.manager.findOneBy(Auth, [
-        { email },
+        { email: email?.toLocaleLowerCase() },
         { phoneNumber: dto.phoneNumber },
       ]);
       if (userExist)
@@ -71,6 +71,7 @@ export class AuthService {
         isVerified: true, // TODO: Remove
       };
       if(email) payload.email = email.toLowerCase();
+     
       if(dto.phoneNumber) payload.phoneNumber = dto.phoneNumber;
       payload.otpTime = new Date();
       payload.userId = await DBUtils.generateUniqueID(
@@ -79,15 +80,13 @@ export class AuthService {
         8,
         firstName,
       );
-
       payload.otp = this.generateOTP();
       const auth = queryRunner.manager.create(Auth, payload);
-
       await queryRunner.manager.save(Auth, auth);
-
+     
       const profile = queryRunner.manager.create(Profile, {
         userId: auth.userId,
-        email: email.toLowerCase(),
+        email: email?.toLowerCase(),
         phoneNumber: auth.phoneNumber,
         firstName,
         lastName,
@@ -95,9 +94,7 @@ export class AuthService {
         disabilityType,
         account: auth,
       });
-
       const newUserProfile = await queryRunner.manager.save(Profile, profile);
-
       const walletData = queryRunner.manager.create(ProfileWallet, { profile });
       const wallet = await queryRunner.manager.save(ProfileWallet, walletData);
 
@@ -107,8 +104,7 @@ export class AuthService {
       auth.profile = newUserProfile;
 
       await queryRunner.manager.save(Auth, auth);
-
-      this.mailService.sendEmail({
+      if(email) this.mailService.sendEmail({
         to: [auth.email],
         subject: 'Account Creation Activation',
         context: {
@@ -143,7 +139,7 @@ export class AuthService {
   async login(dto: AuthDTO, values: { userAgent: string; ipAddress: string }) {
     const user = await this.authRepository.findOne({
       where: [
-        { email: dto.email.toLowerCase() },
+        { email: dto.email?.toLowerCase() },
         { phoneNumber: dto.phoneNumber },
       ],
       relations: ['profile'],
@@ -200,7 +196,7 @@ export class AuthService {
     dto: OtpAuthDTO,
     values: { userAgent: string; ipAddress: string },
   ) {
-    const auth = await this.authRepository.findOneBy({ email: dto.email });
+    const auth = await this.authRepository.findOneBy([{ email: dto.email, phoneNumber: dto.email }]);
     if (!auth)
       throw new NotFoundException(
         'No account found, you can re-register again',
@@ -212,10 +208,8 @@ export class AuthService {
     if (otpExpireTime < Date.now()) {
       throw new ForbiddenException('Verification code has expired');
     }
-    await this.authRepository.update(
-      { email: auth.email },
-      { isVerified: true, otp: undefined },
-    );
+    auth.isVerified = true;
+    await this.authRepository.save(auth);
     this.mailService.sendEmail({
       to: [auth.email],
       subject: 'Account Verified',
@@ -236,7 +230,7 @@ export class AuthService {
   async resendOtp(payload: OtpAuthDTO): Promise<OtpAuthDTO> {
     try {
       const auth = await this.authRepository.findOne({
-        where: { email: payload.email },
+        where: [{ email: payload.email },{phoneNumber: payload.email}],
         relations: ['profile'],
       });
       if (!auth) {
@@ -244,9 +238,10 @@ export class AuthService {
       }
       
       const otp = Number(Math.random().toString().substr(2, 6));
-      await this.authRepository.update(
-        { email: payload.email },
-        { otp, otpTime: new Date() },
+      auth.otp = otp;
+      auth.otpTime = new Date();
+      await this.authRepository.save(
+        auth
       );
       this.mailService.sendEmail({
         to: [auth.email],
@@ -270,7 +265,7 @@ export class AuthService {
   //reset password link
   async requestResetPassword(payload: OtpAuthDTO): Promise<OtpAuthDTO> {
     const auth = await this.authRepository.findOne({
-      where: { email: payload.email },
+      where: [{ email: payload.email }, {phoneNumber: payload.email}],
       relations: ['profile'],
     });
     if (!auth) {
@@ -283,9 +278,10 @@ export class AuthService {
     }
 
     const otp = Number(Math.random().toString().substr(2, 6));
-    await this.authRepository.update(
-      { email: payload.email },
-      { otp, otpTime: new Date() },
+    auth.otp = otp;
+    auth.otpTime = new Date();
+    await this.authRepository.save(
+      auth
     );
     this.mailService.sendEmail({
       to: [payload.email],
@@ -305,7 +301,7 @@ export class AuthService {
 
   //reset password
   async resetPassword(payload: OtpAuthDTO) {
-    const auth = await this.authRepository.findOneBy({ email: payload.email });
+    const auth = await this.authRepository.findOneBy([{ email: payload.email }, {phoneNumber: payload.email}]);
     if (!auth) {
       throw new NotFoundException('Account not found or invalid token');
     }

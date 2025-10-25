@@ -3,6 +3,7 @@ import {
     IsEmail,
     IsNotEmpty,
     IsNumber,
+    IsNumberString,
     IsOptional,
     IsPhoneNumber,
     Length,
@@ -18,7 +19,7 @@ import { QueryRequestDTO } from './query-request.dto';
 
     @ApiPropertyOptional()
     @Length(11, 16)
-    @IsPhoneNumber()
+    @IsNumberString()
     @IsOptional()
     phoneNumber?: string;
   
@@ -44,7 +45,7 @@ import { QueryRequestDTO } from './query-request.dto';
 
     @ApiPropertyOptional()
     @Length(11, 16)
-    @IsPhoneNumber()
+    @IsNumberString()
     @IsOptional()
     phoneNumber?: string;
   
