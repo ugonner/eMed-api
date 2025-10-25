@@ -11,6 +11,7 @@ import { NotificationModule } from '../notifiction/notification.module';
     NotificationModule
   ],
   providers: [AidServiceService],
-  controllers: [AidServiceController]
+  controllers: [AidServiceController],
+  exports: [AidServiceService]
 })
 export class AidServiceModule {}

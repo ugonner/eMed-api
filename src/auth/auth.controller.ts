@@ -158,4 +158,10 @@ export class AuthController {
     const res = await this.authService.getRoles();
     return ApiResponse.success("Users fetched successfully", res);
   }
+
+  @Get("seed")
+  async seedAdminRoleProfile() {
+    const res = await this.authService.seedAdminProfile();
+    return ApiResponse.success("Admin Profile seeded successfully", res);
+  }
 }

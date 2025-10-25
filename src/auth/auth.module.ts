@@ -8,12 +8,14 @@ import { JwtModule } from '@nestjs/jwt';
 import { NotificationModule } from '../notifiction/notification.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailModule } from '../mail/mail.module';
+import { AidServiceModule } from '../aid-service/aid-service.module';
 @Module({
   imports: [
     JwtModule,
     NotificationModule,
     MailModule,
     TypeOrmModule.forFeature([Auth]),
+    AidServiceModule
   ],
   controllers: [AuthController],
   providers: [AuthService],
