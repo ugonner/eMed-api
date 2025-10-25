@@ -524,4 +524,27 @@ export class AidServiceService {
   async getTags(): Promise<Tag[]> {
     return await this.dataSource.getRepository(Tag).find();
   }
+
+  async deleteAidService(aidServieId: number) {
+    let deletedAidService: AidService;
+    let errorData: unknown;
+    const queryRunner = this.dataSource.createQueryRunner();
+    try{
+      await queryRunner.startTransaction();
+      const aidService = await queryRunner.manager.findOneBy(AidService, {id: aidServieId});
+      if(!aidService) throw new BadRequestException("aid service not found");
+      aidService.isDeleted = true;
+      await queryRunner.manager.save(AidService, aidService);
+      await queryRunner.commitTransaction();
+      deletedAidService = aidService;
+    }catch(error){
+      errorData = error;
+      await queryRunner.rollbackTransaction();
+
+    }finally{
+      await queryRunner.release();
+      if(errorData) throw errorData;
+      return deletedAidService;
+    }
+  }
 }

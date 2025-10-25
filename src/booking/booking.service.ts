@@ -312,6 +312,13 @@ export class BookingService {
         booking.aidServiceProfile = sortedProfiles[0].aidServiceProfile;
         booking.isMatched = true;
       }
+      else if((!eligibleProfiles) || eligibleProfiles.length === 0) {
+        const adminServiceProfile = await queryRunner.manager.findOneBy(AidServiceProfile, {
+          profile: {email: `${process.env.OFFICIAL_PROFILE_EMAIL}`.toLowerCase()}
+        });
+        booking.aidServiceProfile = adminServiceProfile;
+        booking.isMatched = true;
+      }
       const savedBooking = await queryRunner.manager.save(Booking, {
         ...booking,
       });
