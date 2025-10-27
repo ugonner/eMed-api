@@ -142,7 +142,7 @@ export class AuthService {
         { email: dto.email?.toLowerCase() },
         { phoneNumber: dto.phoneNumber },
       ],
-      relations: ['profile'],
+      relations: ['profile', "role"],
     });
     if (!user) throw new NotFoundException('Invalid credentials');
 
@@ -152,14 +152,18 @@ export class AuthService {
     if (!isPasswordMatch) throw new BadRequestException('Invalid credentials');
 
     const { accessToken, refreshToken } =
-      await this.generateRefreshAndAccessToken(user.toAuthData(), values);
+      await this.generateRefreshAndAccessToken({
+        id: user.id,
+        userId: user.userId,
+        role: user.role
+      }, values);
 
     const userData = {
       ...user,
       token: accessToken,
       refreshToken,
     };
-
+    delete(userData.password)
     return userData;
   }
 
@@ -221,7 +225,11 @@ export class AuthService {
     })
     .catch((err) => console.log("Error sending account verification email", err.message))
     const { accessToken, refreshToken } =
-      await this.generateRefreshAndAccessToken(auth.toAuthData(), values);
+      await this.generateRefreshAndAccessToken({
+        id: auth.id,
+        userId: auth.userId,
+        role: auth.role
+      }, values);
 
     return { token: accessToken, refresh: refreshToken };
   }
