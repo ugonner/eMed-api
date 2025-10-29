@@ -53,7 +53,7 @@ import { NotificationModule } from './notifiction/notification.module';
         from: `${process.env.NODEMAILER_USERNAME} <${process.env.NODEMAILER_USER}>`, // Default sender
       },
       template: {
-        dir: path.join(__dirname, '../src/mail/templates'), // Path to email templates
+        dir: path.join(__dirname, '../templates'), // Path to email templates
         adapter: new HandlebarsAdapter(), // Template engine adapter
         options: {
           strict: true,
