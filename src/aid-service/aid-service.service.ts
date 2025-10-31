@@ -460,19 +460,10 @@ export class AidServiceService {
       .createQueryBuilder('aidServiceProfile')
       .select(AidServiceProfileSelectFields)
       .leftJoinAndSelect('aidServiceProfile.profile', 'profile')
-      .leftJoin('aidServiceProfile.aidService', 'aidService')
-      .leftJoinAndSelect("aidService.aidServiceClusters", "aidServiceClusters")
-      .leftJoinAndSelect("aidServiceClusters.cluster", "clusters")
       .where('aidServiceProfile.isDeleted = false');
 
     
     
-
-    if (clusterIds) {
-      const clusterArr = clusterIds.split(',');
-      queryBuilder.andWhere('clusters.id IN (:...clusterArr)', { clusterArr });
-    }
-
 
     if (userId) {
       queryBuilder.andWhere('profile.userId = :userId', { userId });
