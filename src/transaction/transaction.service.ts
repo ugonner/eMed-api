@@ -77,7 +77,8 @@ export class TransactionService {
         );
         if (trxExists) {
           if(trxExists.paymentStatus === PaymentStatus.PAID) throw new BadRequestException("Transaction already paid for");
-          transaction = trxExists;
+          trxExists.paymentRef = await this.generateReference();
+          transaction = await queryRunner.manager.save(PaymentTransaction, trxExists);
           return
         }
           

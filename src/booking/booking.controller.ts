@@ -13,13 +13,12 @@ export class BookingController {
         private bookingService: BookingService
     ){}
 
-    //@UseGuards(JwtGuard)
+    @UseGuards(JwtGuard)
     @Post()
     async createBooking(
-        //@User("userId") userId: string,
+        @User("userId") userId: string,
         @Body() payload: CreateBookingDTO
     ){
-        const userId = "ugonna";
         const res = await this.bookingService.createBooking(payload, userId);
         return ApiResponse.success("Booking created successfully", res);
     }
