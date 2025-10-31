@@ -43,19 +43,32 @@ export class PaystackService {
         ...payload,
         amount: payload.amount * 100, // Convert to kobo for NGN
         callback_url: `${process.env.APP_URL}${callback_page}`,
-        reference: payload.paymentRef,
+        reference: `${payload.paymentRef}`,
         metadata,
       };
-     
       const response = await this.axiosInstance.post(
         '/transaction/initialize',
         body,
       );
+      
       return response.data;
     } catch (error) {
+     let errMessage = ""
+     if (axios.isAxiosError(error)) {
+      
+      const paystackMessage =
+        error.response?.data?.message ||
+        error.response?.data?.data ||
+        'Unknown Paystack error';
+      console.error('Paystack message:', paystackMessage);
+      errMessage = paystackMessage;
+    } else {
+      errMessage = error.message;
+    }
+
       console.log('paystack ', error.message);
       throw new HttpException(
-        'Error initiating payment',
+        `Error initializing payment link: ${errMessage}`,
         HttpStatus.BAD_REQUEST,
       );
     }
