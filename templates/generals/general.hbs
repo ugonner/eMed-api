@@ -5,7 +5,12 @@
 {
         <img src="https://res.cloudinary.com/dehs0mpvl/image/upload/v1761384776/wqgundigcheaf5pj36jp.png" alt="company logo" style="width: 50%; height: auto;" />
     </div>
-    <h3>Hi {{name || ""}}</h3>
+    <h3>Hi {{#if name}}
+  {{name}}
+{{else}}
+  ""
+{{/if}}
+</h3>
     <p>{{message}}</p>
     <p>
         The below information is for you
