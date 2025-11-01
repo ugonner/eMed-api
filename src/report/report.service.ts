@@ -67,7 +67,8 @@ export class ReportService {
       const reportData = queryRunner.manager.create(Report, dto);
       reportData.profile = profile;
       reportData.entityOwner = entityOwner;
-
+      reportData.profileId = profile.id;
+      
       const savedReport = await queryRunner.manager.save(Report, reportData);
       await queryRunner.commitTransaction();
       newReport = savedReport;

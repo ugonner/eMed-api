@@ -246,7 +246,7 @@ export class BookingService {
     const oneHourBeforeStartTime = new Date(
       new Date(bookingStartDateTime).getTime() - 1 * 60 * 60 * 1000,
     ).toISOString();
-
+   
     const queryBuilder = this.dataSource
       .getRepository(Profile)
       .createQueryBuilder('profile');
@@ -256,10 +256,10 @@ export class BookingService {
       .where('profile.isDeleted = false')
       .andWhere('aidServiceProfile.isDeleted = false')
       .andWhere(
-        '((bookings.startDate) >= :oneHourAfterEndTime) || ((bookings.endDate) <= :oneHourBeforeStartTime) || bookings.id IS NULL',
+        '((bookings.startDate) >= :oneHourAfterEndTime) OR ((bookings.endDate) <= :oneHourBeforeStartTime) OR bookings.id IS NULL',
         {
           oneHourAfterEndTime,
-          oneHourBeforeStartTime,
+          oneHourBeforeStartTime
         },
       );
 
@@ -313,8 +313,9 @@ export class BookingService {
         booking.isMatched = true;
       }
       else if((!eligibleProfiles) || eligibleProfiles.length === 0) {
-        const adminServiceProfile = await queryRunner.manager.findOneBy(AidServiceProfile, {
-          profile: {email: `${process.env.OFFICIAL_PROFILE_EMAIL}`.toLowerCase()}
+        const adminServiceProfile = await queryRunner.manager.findOne(AidServiceProfile, {
+          where: {profile: {email: `${process.env.OFFICIAL_PROFILE_EMAIL}`.toLowerCase()}},
+          relations: ["profile"]
         });
         booking.aidServiceProfile = adminServiceProfile;
         booking.isMatched = true;

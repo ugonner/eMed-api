@@ -50,7 +50,6 @@ export class PaystackService {
         '/transaction/initialize',
         body,
       );
-      
       return response.data;
     } catch (error) {
      let errMessage = ""

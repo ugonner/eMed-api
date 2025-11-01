@@ -61,6 +61,8 @@ export class ReviewService {
             await queryRunner.manager.save(AidServiceProfile, {...aidServiceProfile});
 
             const reviewData = queryRunner.manager.create(ReviewAndRating, dto);
+            
+            reviewData.profileId = profile.id
             const savedReview = await queryRunner.manager.save(ReviewAndRating, reviewData);
             await queryRunner.commitTransaction();
             newReview = savedReview;
